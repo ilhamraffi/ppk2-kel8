@@ -1,0 +1,26 @@
+{
+  "name": "ppk2-kel8",
+  "version": "1.0.0",
+  "description": "Aplikasi pencatatan keuangan berbasis website yang dirancang khusus untuk mahasiswa agar dapat mengelola keuangan pribadi secara sederhana. Aplikasi ini memungkinkan pengguna untuk membuat akun, mencatat pemasukan dan pengeluaran, serta memantau kondisi keuangan melalui dashboard interaktif. Setiap pengguna memiliki privasi penuh atas datanya sendiri, didukung oleh sistem autentikasi dan manajemen sesi yang aman. Aplikasi ini juga menyimpan preferensi tampilan pengguna untuk memberikan pengalaman yang lebih personal.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "prisma skills sync || exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ilhamraffi/ppk2-kel8.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ilhamraffi/ppk2-kel8/issues"
+  },
+  "homepage": "https://github.com/ilhamraffi/ppk2-kel8#readme",
+  "dependencies": {
+    "@prisma/client": "^7.10.0",
+    "prisma": "^8.0.0-rc.15"
+  }
+}
