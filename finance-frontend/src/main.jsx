@@ -80,10 +80,10 @@ function AuthPage({ mode, onAuthenticated }) {
 }
 function Field({label, children}) { return <label className="field"><span>{label}</span>{children}</label>; }
 
-function Shell({ children, theme, onTheme, onLogout }) { const route = useHashRoute(); return <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand-mark small">F</div><span>FinTrack</span></div><nav><NavItem href="dashboard" active={route === 'dashboard'} icon="▦">Dashboard</NavItem><NavItem href="transactions" active={route === 'transactions'} icon="↔">Transactions</NavItem></nav><div className="sidebar-bottom"><button className="nav-item" onClick={onTheme}><span className="nav-icon">{theme === 'dark' ? '☀' : '☾'}</span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</button><button className="nav-item" onClick={onLogout}><span className="nav-icon">↪</span>Logout</button></div></aside><main className="main-content">{children}</main></div> }
+function Shell({ children, theme, onTheme, onLogout }) { const route = useHashRoute(); return <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand-mark small">F</div><span>FinTrack</span></div><nav><NavItem href="dashboard" active={route === 'dashboard'} icon="▦">Dashboard</NavItem><NavItem href="transactions" active={route === 'transactions'} icon="↔">Transactions</NavItem><NavItem href="budget" active={route === 'budget'} icon="◔">Budget</NavItem></nav><div className="sidebar-bottom"><button className="nav-item" onClick={onTheme}><span className="nav-icon">{theme === 'dark' ? '☀' : '☾'}</span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</button><button className="nav-item" onClick={onLogout}><span className="nav-icon">↪</span>Logout</button></div></aside><main className="main-content">{children}</main></div> }
 function NavItem({href, active, icon, children}) { return <button className={`nav-item ${active ? 'active' : ''}`} onClick={() => navigate(href)}><span className="nav-icon">{icon}</span>{children}</button> }
 
-function Page({route}) { if (route === 'transactions') return <TransactionsPage />; return <DashboardPage />; }
+function Page({route}) { if (route === 'transactions') return <TransactionsPage />; if (route === 'budget') return <BudgetPage />; return <DashboardPage />; }
 
 function DashboardPage() {
   const [dashboard, setDashboard] = useState(null); const [transactions, setTransactions] = useState([]); const [error, setError] = useState('');
@@ -110,5 +110,129 @@ function TransactionModal({mode, transaction, onClose, onSaved}) { const [form, 
 }
 function LoadingPanel(){return <div className="loading-panel"><div className="spinner"/>Loading transactions…</div>}
 function ErrorState({message,onRetry}){return <section className="content"><div className="empty"><strong>Something went wrong</strong><span className="muted">{message}</span><button className="btn primary" onClick={onRetry}>Retry</button></div></section>}
+
+function BudgetPage() {
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [summary, setSummary] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [amountInput, setAmountInput] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadBudget = async (targetMonth) => {
+    setLoading(true);
+    try {
+      setError('');
+      const res = await api(`/api/budgets?month=${targetMonth}`);
+      setSummary(res.data);
+      if (res.data?.budget_amount) setAmountInput(res.data.budget_amount);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadBudget(month); }, [month]);
+
+  const handleSaveBudget = async (e) => {
+    e.preventDefault();
+    try {
+      await api('/api/budgets', {
+        method: 'POST',
+        body: JSON.stringify({ month, amount: parseFloat(amountInput) })
+      });
+      setModalOpen(false);
+      loadBudget(month);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    if (status === 'exceeded') return 'var(--danger, #ef4444)';
+    if (status === 'warning') return 'var(--warning, #f59e0b)';
+    return 'var(--success, #10b981)';
+  };
+
+  return <>
+    <Header title="Monthly Budget" subtitle="Monitor and control your monthly spending" />
+    <section className="content">
+      <div className="toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <label style={{ marginRight: '8px', fontWeight: 'bold' }}>Pilih Bulan:</label>
+          <input
+            type="month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            className="month-picker"
+          />
+        </div>
+        <button className="btn primary" onClick={() => setModalOpen(true)}>
+          {summary?.budget_amount > 0 ? '✎ Ubah Anggaran' : '+ Atur Anggaran'}
+        </button>
+      </div>
+
+      {error && <div className="alert error">{error}</div>}
+
+      {loading ? <LoadingPanel /> : <>
+        <div className="cards" style={{ marginTop: '16px' }}>
+          <StatCard label="Target Anggaran" value={money(summary?.budget_amount)} accent="balance" />
+          <StatCard label="Pengeluaran Bulan Ini" value={money(summary?.total_expense)} accent="expense" />
+          <StatCard
+            label="Sisa Anggaran"
+            value={money(summary?.remaining_budget)}
+            accent={summary?.remaining_budget < 0 ? 'expense' : 'income'}
+          />
+        </div>
+
+        <div className="budget-indicator-card" style={{ marginTop: '24px', padding: '20px', background: 'var(--card-bg, #fff)', borderRadius: '8px', border: '1px solid var(--border, #e5e7eb)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span><strong>Penggunaan Anggaran:</strong> {summary?.percentage_used || 0}%</span>
+            <span style={{ color: getStatusColor(summary?.status), fontWeight: 'bold' }}>
+              {summary?.status === 'exceeded' ? '⚠️ Melebihi Anggaran' : summary?.status === 'warning' ? '⚡ Mendekati Batas' : '✔ Normal / Aman'}
+            </span>
+          </div>
+          <div style={{ width: '100%', height: '14px', background: '#e5e7eb', borderRadius: '7px', overflow: 'hidden' }}>
+            <div style={{
+              width: `${Math.min(summary?.percentage_used || 0, 100)}%`,
+              height: '100%',
+              backgroundColor: getStatusColor(summary?.status),
+              transition: 'width 0.4s ease'
+            }} />
+          </div>
+        </div>
+      </>}
+    </section>
+
+    {modalOpen && (
+      <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setModalOpen(false)}>
+        <div className="modal">
+          <div className="modal-head">
+            <h2>Atur Anggaran ({month})</h2>
+            <button className="icon-btn" onClick={() => setModalOpen(false)}>×</button>
+          </div>
+          <form onSubmit={handleSaveBudget}>
+            <Field label="Nominal Anggaran (Rp)">
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={amountInput}
+                onChange={(e) => setAmountInput(e.target.value)}
+                required
+                placeholder="Contoh: 2000000"
+              />
+            </Field>
+            <div className="modal-actions" style={{ marginTop: '16px' }}>
+              <button type="button" className="btn secondary" onClick={() => setModalOpen(false)}>Batal</button>
+              <button type="submit" className="btn primary">Simpan Anggaran</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+  </>;
+}
 
 createRoot(document.getElementById('root')).render(<App />);
