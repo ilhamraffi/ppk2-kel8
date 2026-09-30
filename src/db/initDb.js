@@ -26,8 +26,22 @@ const initDb = async () => {
     CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date);
   `;
 
+  const createBudgetsTableQuery = `
+    CREATE TABLE IF NOT EXISTS budgets (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      month VARCHAR(7) NOT NULL,
+      amount NUMERIC(15, 2) NOT NULL CHECK (amount > 0),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT unique_user_monthly_budget UNIQUE (user_id, month)
+    );
+    CREATE INDEX IF NOT EXISTS idx_budgets_user_month ON budgets(user_id, month);
+  `;
+
   await query(createUsersTableQuery);
   await query(createTransactionsTableQuery);
+  await query(createBudgetsTableQuery);
 };
 
 module.exports = { initDb };

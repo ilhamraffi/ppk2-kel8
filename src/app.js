@@ -6,6 +6,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const budgetRoutes = require('./routes/budgetRoutes');
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use(session({
 app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/budgets', budgetRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
