@@ -47,15 +47,15 @@ function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; setCookie(THEME_COOKIE, theme); }, [theme]);
   useEffect(() => {
-    // The contract exposes no current-user endpoint, so session validity is checked by protected dashboard data.
-    api('/api/dashboard').then(() => setUser({ authenticated: true })).catch(() => setUser(null)).finally(() => setCheckingSession(false));
+    // The backend exposes GET /api/auth/me, so the session and user name come from one call.
+    api('/api/auth/me').then(me => setUser(me)).catch(() => setUser(null)).finally(() => setCheckingSession(false));
   }, []);
 
   if (checkingSession) return <LoadingScreen />;
   if (!user || route === 'login' || route === 'register') {
-    return route === 'register' ? <AuthPage mode="register" onAuthenticated={() => { setUser({ authenticated: true }); navigate('dashboard'); }} /> : <AuthPage mode="login" onAuthenticated={() => { setUser({ authenticated: true }); navigate('dashboard'); }} />;
+    return route === 'register' ? <AuthPage mode="register" onAuthenticated={(u) => { setUser(u); navigate('dashboard'); }} /> : <AuthPage mode="login" onAuthenticated={(u) => { setUser(u); navigate('dashboard'); }} />;
   }
-  return <Shell theme={theme} onTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} onLogout={async () => { try { await api('/api/auth/logout', { method: 'POST' }); } finally { setUser(null); navigate('login'); } }}><Page route={route} /></Shell>;
+  return <Shell theme={theme} onTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} user={user} onLogout={async () => { try { await api('/api/auth/logout', { method: 'POST' }); } finally { setUser(null); navigate('login'); } }}><Page route={route} /></Shell>;
 }
 
 function LoadingScreen() { return <div className="center-screen"><div className="spinner"/><span>Checking session…</span></div>; }
@@ -66,21 +66,24 @@ function AuthPage({ mode, onAuthenticated }) {
   const [error, setError] = useState(''); const [loading, setLoading] = useState(false);
   const submit = async e => {
     e.preventDefault(); setError('');
+    if (isRegister && !form.name.trim()) return setError('Please enter your full name.');
     if (!/^\S+@\S+\.\S+$/.test(form.email)) return setError('Please enter a valid email address.');
     if (form.password.length < 8) return setError('Password must be at least 8 characters.');
     if (isRegister && form.password !== form.confirmPassword) return setError('Passwords do not match.');
     setLoading(true);
     try {
-      const payload = { email: form.email.trim(), password: form.password };
-      await api(isRegister ? '/api/auth/register' : '/api/auth/login', { method: 'POST', body: JSON.stringify(payload) });
-      if (isRegister) navigate('login'); else onAuthenticated();
+      const payload = isRegister
+        ? { name: form.name.trim(), email: form.email.trim(), password: form.password }
+        : { email: form.email.trim(), password: form.password };
+      const res = await api(isRegister ? '/api/auth/register' : '/api/auth/login', { method: 'POST', body: JSON.stringify(payload) });
+      if (isRegister) navigate('login'); else onAuthenticated(res?.user ?? { authenticated: true });
     } catch (err) { setError(err.data?.errors ? Object.values(err.data.errors).flat().join(' ') : err.message); } finally { setLoading(false); }
    };
-   return <main className="auth-layout"><section className="auth-brand"><div className="brand-mark">F</div><h1>FinTrack</h1><p>Simple, clear control over your personal finances.</p></section><section className="auth-card"><div className="eyebrow">WELCOME</div><h2>{isRegister ? 'Create your account' : 'Welcome back'}</h2><p className="muted">{isRegister ? 'Start tracking your money in one place.' : 'Sign in to continue to your dashboard.'}</p>{error && <div className="alert error">{error}</div>}<form onSubmit={submit} noValidate><Field label="Email"><input type="email" value={form.email} onChange={e => setForm({...form, email:e.target.value})} required autoComplete="email" /></Field><Field label="Password"><input type="password" value={form.password} onChange={e => setForm({...form, password:e.target.value})} required minLength="8" autoComplete={isRegister ? 'new-password' : 'current-password'} /></Field>{isRegister && <Field label="Confirm password"><input type="password" value={form.confirmPassword} onChange={e => setForm({...form, confirmPassword:e.target.value})} required autoComplete="new-password" /></Field>}<button className="btn primary full" disabled={loading}>{loading ? 'Please wait…' : isRegister ? 'Create account' : 'Sign in'}</button></form><p className="switch-auth">{isRegister ? 'Already have an account?' : 'New to FinTrack?'} <button className="link-button" onClick={() => navigate(isRegister ? 'login' : 'register')}>{isRegister ? 'Sign in' : 'Create account'}</button></p></section></main>;
+   return <main className="auth-layout"><section className="auth-brand"><div className="brand-mark">F</div><h1>FinTrack</h1><p>Simple, clear control over your personal finances.</p></section><section className="auth-card"><div className="eyebrow">WELCOME</div><h2>{isRegister ? 'Create your account' : 'Welcome back'}</h2><p className="muted">{isRegister ? 'Start tracking your money in one place.' : 'Sign in to continue to your dashboard.'}</p>{error && <div className="alert error">{error}</div>}<form onSubmit={submit} noValidate>{isRegister && <Field label="Full name"><input type="text" value={form.name} onChange={e => setForm({...form, name:e.target.value})} required autoComplete="name" /></Field>}<Field label="Email"><input type="email" value={form.email} onChange={e => setForm({...form, email:e.target.value})} required autoComplete="email" /></Field><Field label="Password"><input type="password" value={form.password} onChange={e => setForm({...form, password:e.target.value})} required minLength="8" autoComplete={isRegister ? 'new-password' : 'current-password'} /></Field>{isRegister && <Field label="Confirm password"><input type="password" value={form.confirmPassword} onChange={e => setForm({...form, confirmPassword:e.target.value})} required autoComplete="new-password" /></Field>}<button className="btn primary full" disabled={loading}>{loading ? 'Please wait…' : isRegister ? 'Create account' : 'Sign in'}</button></form><p className="switch-auth">{isRegister ? 'Already have an account?' : 'New to FinTrack?'} <button className="link-button" onClick={() => navigate(isRegister ? 'login' : 'register')}>{isRegister ? 'Sign in' : 'Create account'}</button></p></section></main>;
 }
 function Field({label, children}) { return <label className="field"><span>{label}</span>{children}</label>; }
 
-function Shell({ children, theme, onTheme, onLogout }) { const route = useHashRoute(); return <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand-mark small">F</div><span>FinTrack</span></div><nav><NavItem href="dashboard" active={route === 'dashboard'} icon="▦">Dashboard</NavItem><NavItem href="transactions" active={route === 'transactions'} icon="↔">Transactions</NavItem><NavItem href="budget" active={route === 'budget'} icon="◔">Budget</NavItem></nav><div className="sidebar-bottom"><button className="nav-item" onClick={onTheme}><span className="nav-icon">{theme === 'dark' ? '☀' : '☾'}</span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</button><button className="nav-item" onClick={onLogout}><span className="nav-icon">↪</span>Logout</button></div></aside><main className="main-content">{children}</main></div> }
+function Shell({ children, theme, onTheme, onLogout, user }) { const route = useHashRoute(); return <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand-mark small">F</div><span>FinTrack</span></div>{user?.name && <div className="sidebar-user"><span className="muted">Signed in as</span><strong>{user.name}</strong></div>}<nav><NavItem href="dashboard" active={route === 'dashboard'} icon="▦">Dashboard</NavItem><NavItem href="transactions" active={route === 'transactions'} icon="↔">Transactions</NavItem><NavItem href="budget" active={route === 'budget'} icon="◔">Budget</NavItem></nav><div className="sidebar-bottom"><button className="nav-item" onClick={onTheme}><span className="nav-icon">{theme === 'dark' ? '☀' : '☾'}</span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</button><button className="nav-item" onClick={onLogout}><span className="nav-icon">↪</span>Logout</button></div></aside><main className="main-content">{children}</main></div> }
 function NavItem({href, active, icon, children}) { return <button className={`nav-item ${active ? 'active' : ''}`} onClick={() => navigate(href)}><span className="nav-icon">{icon}</span>{children}</button> }
 
 function Page({route}) { if (route === 'transactions') return <TransactionsPage />; if (route === 'budget') return <BudgetPage />; return <DashboardPage />; }

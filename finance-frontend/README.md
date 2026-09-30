@@ -4,7 +4,8 @@ A new React + Vite frontend implementing the agreed finance application contract
 
 ## API contract used
 
-- `POST /api/auth/register` — sends `{ email, password }` because those are the only register request fields explicitly specified.
+- `POST /api/auth/register` — sends `{ name, email, password }`. The backend requires `name`, so the register form collects it.
+- `GET /api/auth/me` — used to restore the session and the signed-in user's name on load.
 - `POST /api/auth/login` — sends `{ email, password }`.
 - `POST /api/auth/logout`
 - `GET /api/dashboard`
@@ -17,9 +18,9 @@ A new React + Vite frontend implementing the agreed finance application contract
 
 No `user_id` is sent by the frontend. Authentication is allowed to remain session/cookie based through `credentials: include`.
 
-## Important contract gap
+## Resolved contract gap
 
-The supplied contract does not define a register request body beyond the endpoint, nor a current-user/name endpoint or response shape. Therefore this frontend does **not** invent a `name` field or `/api/auth/me` endpoint. The dashboard UI is ready for the documented dashboard response; if the backend must return/display the authenticated user's name, the team should document where that name comes from (for example, a field in the login response) before wiring it in.
+The contract previously left the register body and a current-user endpoint undefined. The backend has since settled both: `POST /api/auth/register` requires `name`, and `GET /api/auth/me` returns `{ id, name, email }` from the server session. The frontend now sends `name` on register and uses `/api/auth/me` on load to restore the session and show the signed-in user's name.
 
 ## Setup
 
@@ -29,7 +30,7 @@ npm install
 npm run dev
 ```
 
-Set `VITE_API_BASE_URL` to the backend origin, for example `http://localhost:8000`.
+Set `VITE_API_BASE_URL` to the backend origin, for example `http://localhost:3000`. The dev server itself runs on `http://localhost:5173`.
 
 ## UI behavior
 
@@ -42,4 +43,4 @@ Set `VITE_API_BASE_URL` to the backend origin, for example `http://localhost:800
 
 ## Testing status
 
-The project source and contract wiring are implemented. Browser E2E could not be executed in this environment because no browser-testing tool/backend instance is available. Dependency installation also could not complete in the execution environment, so `npm run build` could not be run successfully here (`vite: not found`). No commit or push should be made until the dependencies are installed and the E2E flow is run against the actual backend.
+Dependencies install and `npm run build` succeeds. Browser E2E has not been run against a live backend yet.
